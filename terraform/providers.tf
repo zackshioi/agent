@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.5"
 
   required_providers {
     aws = {
@@ -22,3 +22,5 @@ provider "aws" {
   alias  = "ap_southeast_2"
   region = "ap-southeast-2"
 }
+
+data "aws_caller_identity" "current" {}

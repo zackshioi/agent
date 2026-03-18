@@ -1,9 +1,13 @@
 .PHONY: \
 	remote-backend-setup \
 	init \
-	github-oidc-setup
+	github-oidc-setup \
+	validate \
+	plan \
+	deploy
 
 ENVIRONMENT ?= dev
+TFVARS_FILE := $(ENVIRONMENT).tfvars
 GITHUB_REPOSITORY := zackshioi/agent
 GITHUB_ACTIONS_TARGETS := \
 	-target=aws_iam_role.github_actions \
@@ -37,7 +41,6 @@ init:
 		exit 1; \
 	fi; \
 	terraform init \
-		-input=false \
 		-backend-config="bucket=zackshioi-agent-terraform-state" \
 		-backend-config="key=$(ENVIRONMENT)/terraform.tfstate" \
 		-backend-config="region=$${AWS_REGION}" \
@@ -59,3 +62,30 @@ github-oidc-setup:
 		terraform apply $(GITHUB_ACTIONS_TARGETS_WITH_OIDC) -var="github_repository=$(GITHUB_REPOSITORY)"; \
 	fi
 	terraform output github_actions_role_arn
+
+validate:
+	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
+	if terraform workspace select $(ENVIRONMENT); then \
+		echo "Using existing workspace: $(ENVIRONMENT)"; \
+	else \
+		terraform workspace new $(ENVIRONMENT); \
+	fi
+	terraform validate
+
+plan:
+	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
+	if terraform workspace select $(ENVIRONMENT); then \
+		echo "Using existing workspace: $(ENVIRONMENT)"; \
+	else \
+		terraform workspace new $(ENVIRONMENT); \
+	fi
+	terraform plan  -var-file="$(TFVARS_FILE)" 
+
+deploy:
+	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
+	if terraform workspace select $(ENVIRONMENT); then \
+		echo "Using existing workspace: $(ENVIRONMENT)"; \
+	else \
+		terraform workspace new $(ENVIRONMENT); \
+	fi
+	terraform apply  -var-file="$(TFVARS_FILE)" 

@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "backend/ingest/**"
+      - "terraform/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-2
+  TF_ENVIRONMENT: dev
+  LAMBDA_ARTIFACTS_BUCKET: zackshioi-agent-lambda-artifacts
+  LAMBDA_PACKAGE_S3_KEY: ingest/lambda_function.zip
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ingest: ${{ steps.filter.outputs.ingest }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ingest:
+              - 'backend/ingest/**'
+            terraform:
+              - 'terraform/**'
+              - '.github/workflows/ci.yml'
+
+  package-ingest:
+    needs: changes
+    if: needs.changes.outputs.ingest == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install ingest dependencies
+        working-directory: backend/ingest
+        run: uv sync
+
+      - name: Build Lambda package
+        working-directory: backend/ingest
+        run: uv run package.py
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Upload Lambda package to S3
+        run: aws s3 cp backend/ingest/lambda_function.zip "s3://${LAMBDA_ARTIFACTS_BUCKET}/${LAMBDA_PACKAGE_S3_KEY}"
+
+  terraform-checks:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Terraform validate
+        run: make validate ENVIRONMENT=${TF_ENVIRONMENT}
+
+      - name: Terraform plan
+        run: make plan ENVIRONMENT=${TF_ENVIRONMENT}
