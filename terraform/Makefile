@@ -1,11 +1,3 @@
-.PHONY: \
-	remote-backend-setup \
-	init \
-	github-oidc-setup \
-	validate \
-	plan \
-	deploy
-
 ENVIRONMENT ?= dev
 TFVARS_FILE := $(ENVIRONMENT).tfvars
 GITHUB_REPOSITORY := zackshioi/agent
@@ -24,6 +16,7 @@ GITHUB_ACTIONS_TARGETS_WITH_OIDC := \
 	-target=aws_iam_openid_connect_provider.github \
 	$(GITHUB_ACTIONS_TARGETS)
 
+.PHONY: remote-backend-setup
 remote-backend-setup:
 	terraform workspace select default
 	terraform init
@@ -34,6 +27,7 @@ remote-backend-setup:
 		-target=aws_s3_bucket_public_access_block.terraform_state \
 		-target=aws_dynamodb_table.terraform_locks
 
+.PHONY: init
 init:
 	AWS_REGION=$${DEFAULT_AWS_REGION:-ap-southeast-2}; \
 	if [ -z "$(ENVIRONMENT)" ]; then \
@@ -41,12 +35,14 @@ init:
 		exit 1; \
 	fi; \
 	terraform init \
+		-reconfigure \
 		-backend-config="bucket=zackshioi-agent-terraform-state" \
 		-backend-config="key=$(ENVIRONMENT)/terraform.tfstate" \
 		-backend-config="region=$${AWS_REGION}" \
 		-backend-config="dynamodb_table=agent-terraform-locks" \
 		-backend-config="encrypt=true"
 
+.PHONY: github-oidc-setup
 github-oidc-setup:
 	terraform workspace select default
 	OIDC_PROVIDER_ARN=$$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?contains(Arn, 'token.actions.githubusercontent.com')].Arn" --output text); \
@@ -63,6 +59,7 @@ github-oidc-setup:
 	fi
 	terraform output github_actions_role_arn
 
+.PHONY: validate
 validate:
 	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
 	if terraform workspace select $(ENVIRONMENT); then \
@@ -72,6 +69,7 @@ validate:
 	fi
 	terraform validate
 
+.PHONY: plan
 plan:
 	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
 	if terraform workspace select $(ENVIRONMENT); then \
@@ -79,8 +77,9 @@ plan:
 	else \
 		terraform workspace new $(ENVIRONMENT); \
 	fi
-	terraform plan  -var-file="$(TFVARS_FILE)" 
+	terraform plan -var-file="$(TFVARS_FILE)" 
 
+.PHONY: deploy
 deploy:
 	$(MAKE) init ENVIRONMENT=$(ENVIRONMENT)
 	if terraform workspace select $(ENVIRONMENT); then \
@@ -88,4 +87,4 @@ deploy:
 	else \
 		terraform workspace new $(ENVIRONMENT); \
 	fi
-	terraform apply  -var-file="$(TFVARS_FILE)" 
+	terraform apply -auto-approve -var-file="$(TFVARS_FILE)"
