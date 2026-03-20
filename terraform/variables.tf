@@ -47,7 +47,7 @@ variable "lambda_artifacts_bucket_name" {
 variable "lambda_package_s3_key" {
   description = "S3 key for the Lambda deployment package zip"
   type        = string
-  default     = "backend/ingest/lambda_function.zip"
+  default     = "ingest/lambda_function.zip"
 }
 
 variable "lambda_package_s3_object_version" {
