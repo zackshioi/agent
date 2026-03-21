@@ -8,12 +8,6 @@ on:
       - ".github/workflows/ci.yml"
   workflow_dispatch:
 
-env:
-  AWS_REGION: ap-southeast-2
-  TF_ENVIRONMENT: dev
-  LAMBDA_ARTIFACTS_BUCKET: zackshioi-agent-lambda-artifacts
-  LAMBDA_PACKAGE_S3_KEY: ingest/lambda_function.zip
-
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -39,6 +33,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    environment: dev
+    env:
+      LAMBDA_ARTIFACTS_BUCKET: ${{ vars.LAMBDA_ARTIFACTS_BUCKET }}
+      LAMBDA_PACKAGE_S3_KEY: ${{ vars.LAMBDA_PACKAGE_S3_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +57,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: $${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Upload Lambda package to S3
@@ -75,6 +73,11 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    environment: dev
+    env:
+      TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+      TF_VAR_agent_api_key: ${{ secrets.AGENT_API_KEY }}
+      TF_ENVIRONMENT: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +88,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Terraform validate

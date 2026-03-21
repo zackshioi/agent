@@ -44,6 +44,7 @@ init:
 
 .PHONY: github-oidc-setup
 github-oidc-setup:
+	@cd initializing
 	terraform workspace select default
 	OIDC_PROVIDER_ARN=$$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?contains(Arn, 'token.actions.githubusercontent.com')].Arn" --output text); \
 	if [ -n "$${OIDC_PROVIDER_ARN}" ]; then \

@@ -55,3 +55,20 @@ variable "lambda_package_s3_object_version" {
   type        = string
   default     = null
 }
+
+variable "openai_api_key" {
+  description = "OpenAI API key for the researcher agent"
+  type        = string
+  sensitive   = true
+}
+
+variable "agent_api_endpoint" {
+  description = "Alex API endpoint from Part ingestion"
+  type        = string
+}
+
+variable "agent_api_key" {
+  description = "Alex API key from Part igestion"
+  type        = string
+  sensitive   = true
+}
