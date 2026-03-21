@@ -34,15 +34,15 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.researcher.repository_url
 }
 
-output "app_runner_service_url" {
-  description = "URL of the App Runner service"
-  value       = try("https://${aws_apprunner_service.researcher.service_url}", "Not created yet - run 'terraform apply' after deploying Docker image")
-}
+# output "app_runner_service_url" {
+#   description = "URL of the App Runner service"
+#   value       = "Not created yet - enable aws_apprunner_service.researcher and apply Terraform first"
+# }
 
-output "app_runner_service_id" {
-  description = "ID of the App Runner service"
-  value       = try(aws_apprunner_service.researcher.id, "Not created yet")
-}
+# output "app_runner_service_id" {
+#   description = "ID of the App Runner service"
+#   value       = "Not created yet - enable aws_apprunner_service.researcher and apply Terraform first"
+# }
 
 output "setup_instructions" {
   description = "Instructions for setting up environment variables"
@@ -68,9 +68,9 @@ output "setup_instructions" {
       -H "Content-Type: application/json" \
       -d '{"content": "Test document", "metadata": {"source": "test"}}'
 
-    Service URL: https://${aws_apprunner_service.researcher.service_url}
+    Service URL: Not created yet - enable aws_apprunner_service.researcher and apply Terraform first
     
     Test the researcher:
-    curl https://${aws_apprunner_service.researcher.service_url}/research
+    curl <app-runner-service-url>/research
   EOT
 }
