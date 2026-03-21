@@ -5,20 +5,37 @@ on:
     branches:
       - main
     paths:
+      - "backend/researcher/**"
       - "terraform/**"
       - ".github/workflows/cd.yml"
   workflow_dispatch:
-
-env:
-  AWS_REGION: ap-southeast-2
-  TF_ENVIRONMENT: dev
 
 concurrency:
   group: terraform-deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      researcher: ${{ steps.filter.outputs.researcher }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            researcher:
+              - 'backend/researcher/**'
+              - '.github/workflows/cd.yml'
+            terraform:
+              - 'terraform/**'
+              - '.github/workflows/cd.yml'
+
   deploy-terraform:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,6 +43,11 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    environment: dev
+    env:
+      TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+      TF_VAR_agent_api_key: ${{ secrets.AGENT_API_KEY }}
+      TF_ENVIRONMENT: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -36,8 +58,59 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Terraform deploy
         run: make deploy ENVIRONMENT=${TF_ENVIRONMENT}
+
+  deploy-researcher:
+    needs: changes
+    if: needs.changes.outputs.researcher == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: dev
+    env:
+      DEFAULT_AWS_REGION: ${{ vars.AWS_REGION }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+      AGENT_API_ENDPOINT: ${{ vars.AGENT_API_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install researcher deploy dependencies
+        working-directory: backend/researcher
+        run: uv sync
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Check if ECR repository exists
+        id: ecr
+        run: |
+          repository_uri="$(aws ecr describe-repositories --repository-names agent-researcher --region "${DEFAULT_AWS_REGION}" --query 'repositories[0].repositoryUri' --output text 2>/dev/null)"
+          if [ -n "$repository_uri" ] && [ "$repository_uri" != "None" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "repository_uri=$repository_uri" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "ECR repository agent-researcher does not exist. Skipping researcher deployment."
+          fi
+
+      - name: Deploy researcher
+        if: steps.ecr.outputs.exists == 'true'
+        working-directory: backend/researcher
+        env:
+          ECR_REPOSITORY_URL: ${{ steps.ecr.outputs.repository_uri }}
+        run: uv run python deploy.py

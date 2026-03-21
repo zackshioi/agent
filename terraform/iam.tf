@@ -95,3 +95,83 @@ resource "aws_iam_role_policy" "lambda_policy" {
     ]
   })
 }
+
+# IAM role for App Runner
+resource "aws_iam_role" "app_runner_role" {
+  name = "agent-app-runner-role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "build.apprunner.amazonaws.com"
+        }
+      },
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "tasks.apprunner.amazonaws.com"
+        }
+      }
+    ]
+  })
+  
+  tags = {
+    Project = "agent"
+    Part    = "researcher"
+  }
+}
+
+# Policy for App Runner to access ECR
+resource "aws_iam_role_policy_attachment" "app_runner_ecr_access" {
+  role       = aws_iam_role.app_runner_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
+}
+
+# IAM role for App Runner instance (runtime access to AWS services)
+resource "aws_iam_role" "app_runner_instance_role" {
+  name = "agent-app-runner-instance-role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "tasks.apprunner.amazonaws.com"
+        }
+      }
+    ]
+  })
+  
+  tags = {
+    Project = "agent"
+    Part    = "researcher"
+  }
+}
+
+# Policy for App Runner instance to access Bedrock
+resource "aws_iam_role_policy" "app_runner_instance_bedrock_access" {
+  name = "agent-app-runner-instance-bedrock-policy"
+  role = aws_iam_role.app_runner_instance_role.id
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:ListFoundationModels"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
