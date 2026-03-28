@@ -161,10 +161,27 @@
 #           "ecr:CompleteLayerUpload",
 #           "ecr:DescribeRepositories",
 #           "ecr:InitiateLayerUpload",
+#           "ecr:ListTagsForResource",
 #           "ecr:PutImage",
 #           "ecr:UploadLayerPart"
 #         ]
 #         Resource = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/*"
+#       },
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "logs:ListTagsForResource"
+#         ]
+#         Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*"
+#       },
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "apprunner:DescribeService",
+#           "apprunner:ListServices",
+#           "apprunner:UpdateService"
+#         ]
+#         Resource = "*"
 #       },
 #       {
 #         Effect = "Allow"
