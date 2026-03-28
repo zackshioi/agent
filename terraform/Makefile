@@ -1,6 +1,8 @@
 ENVIRONMENT ?= dev
 TFVARS_FILE := $(ENVIRONMENT).tfvars
 GITHUB_REPOSITORY := zackshioi/agent
+GITHUB_OIDC_STATE_KEY := initializing/github-oidc.tfstate
+GITHUB_ACTIONS_ROLE_NAME := github-actions-agent-deploy
 GITHUB_ACTIONS_TARGETS := \
 	-target=aws_iam_role.github_actions \
 	-target=aws_iam_role_policy_attachment.github_lambda \
@@ -44,21 +46,34 @@ init:
 
 .PHONY: github-oidc-setup
 github-oidc-setup:
-	@cd initializing
-	terraform workspace select default
+	AWS_REGION=$${DEFAULT_AWS_REGION:-ap-southeast-2}; \
+	terraform -chdir=initializing init \
+		-migrate-state \
+		-force-copy \
+		-backend-config="bucket=zackshioi-agent-terraform-state" \
+		-backend-config="key=$(GITHUB_OIDC_STATE_KEY)" \
+		-backend-config="region=$${AWS_REGION}" \
+		-backend-config="dynamodb_table=agent-terraform-locks" \
+		-backend-config="encrypt=true"
+	terraform -chdir=initializing workspace select default
 	OIDC_PROVIDER_ARN=$$(aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?contains(Arn, 'token.actions.githubusercontent.com')].Arn" --output text); \
 	if [ -n "$${OIDC_PROVIDER_ARN}" ]; then \
-		if terraform state list | grep -q '^aws_iam_openid_connect_provider\.github$$'; then \
+		if terraform -chdir=initializing state list | grep -q '^aws_iam_openid_connect_provider\.github$$'; then \
 			echo "aws_iam_openid_connect_provider.github is already in Terraform state, skipping import"; \
 		else \
 			AWS_ACCOUNT_ID=$$(aws sts get-caller-identity --query Account --output text); \
-			terraform import aws_iam_openid_connect_provider.github arn:aws:iam::$${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com; \
+			terraform -chdir=initializing import aws_iam_openid_connect_provider.github arn:aws:iam::$${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com; \
 		fi; \
-		terraform apply $(GITHUB_ACTIONS_TARGETS) -var="github_repository=$(GITHUB_REPOSITORY)"; \
+		if terraform -chdir=initializing state list | grep -q '^aws_iam_role\.github_actions$$'; then \
+			echo "aws_iam_role.github_actions is already in Terraform state, skipping import"; \
+		elif aws iam get-role --role-name "$(GITHUB_ACTIONS_ROLE_NAME)" >/dev/null 2>&1; then \
+			terraform -chdir=initializing import aws_iam_role.github_actions $(GITHUB_ACTIONS_ROLE_NAME); \
+		fi; \
+		terraform -chdir=initializing apply $(GITHUB_ACTIONS_TARGETS) -var="github_repository=$(GITHUB_REPOSITORY)"; \
 	else \
-		terraform apply $(GITHUB_ACTIONS_TARGETS_WITH_OIDC) -var="github_repository=$(GITHUB_REPOSITORY)"; \
+		terraform -chdir=initializing apply $(GITHUB_ACTIONS_TARGETS_WITH_OIDC) -var="github_repository=$(GITHUB_REPOSITORY)"; \
 	fi
-	terraform output github_actions_role_arn
+	terraform -chdir=initializing output github_actions_role_arn
 
 .PHONY: validate
 validate:
