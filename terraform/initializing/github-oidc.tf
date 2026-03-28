@@ -1,20 +1,44 @@
+# terraform {
+#   required_version = ">= 1.5"
+
+#   required_providers {
+#     aws = {
+#       source = "hashicorp/aws"
+#       version = "~> 6.0"
+#     }
+#   }
+
+#   backend "s3" {}
+# }
+
+# provider "aws" {
+#   region = var.aws_region
+# }
+
 # variable "github_repository" {
 #   description = "GitHub repository in format 'owner/repo'"
 #   type        = string
 # }
+
+# variable "aws_region" {
+#   description = "AWS region for resources that require regional ARNs"
+#   type        = string
+#   default     = "ap-southeast-2"
+# }
+
+# data "aws_caller_identity" "current" {}
 
 # # GitHub OIDC Provider
 # # Note: If this already exists in your account, you'll need to import it:
 # # terraform import aws_iam_openid_connect_provider.github arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com
 # resource "aws_iam_openid_connect_provider" "github" {
 #   url = "https://token.actions.githubusercontent.com"
-  
+
 #   client_id_list = [
 #     "sts.amazonaws.com"
 #   ]
-  
-#   # This thumbprint is from GitHub's documentation
-#   # Verify current value at: https://github.blog/changelog/2023-06-27-github-actions-update-on-oidc-integration-with-aws/
+
+#   # This thumbprint is from GitHub's documentation.
 #   thumbprint_list = [
 #     "1c58a3a8518e8759bf075b76b750d4f2df264fcd"
 #   ]
@@ -23,7 +47,7 @@
 # # IAM Role for GitHub Actions
 # resource "aws_iam_role" "github_actions" {
 #   name = "github-actions-agent-deploy"
-  
+
 #   assume_role_policy = jsonencode({
 #     Version = "2012-10-17"
 #     Statement = [
@@ -44,11 +68,11 @@
 #       }
 #     ]
 #   })
-  
+
 #   tags = {
-#     Name        = "GitHub Actions Deploy Role"
-#     Repository  = var.github_repository
-#     ManagedBy   = "terraform"
+#     Name       = "GitHub Actions Deploy Role"
+#     Repository = var.github_repository
+#     ManagedBy  = "terraform"
 #   }
 # }
 
@@ -122,6 +146,25 @@
 #           "sts:GetCallerIdentity"
 #         ]
 #         Resource = "*"
+#       },
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "ecr:GetAuthorizationToken"
+#         ]
+#         Resource = "*"
+#       },
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "ecr:BatchCheckLayerAvailability",
+#           "ecr:CompleteLayerUpload",
+#           "ecr:DescribeRepositories",
+#           "ecr:InitiateLayerUpload",
+#           "ecr:PutImage",
+#           "ecr:UploadLayerPart"
+#         ]
+#         Resource = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/*"
 #       },
 #       {
 #         Effect = "Allow"
