@@ -23,7 +23,7 @@ def get_service_url():
         
         service_arns = json.loads(result.stdout)
         if not service_arns:
-            print("❌ App Runner service 'alex-researcher' not found.")
+            print("❌ App Runner service 'agent-researcher' not found.")
             print("   Have you deployed it yet? Run: python deploy.py")
             sys.exit(1)
         
