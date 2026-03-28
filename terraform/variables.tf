@@ -63,12 +63,12 @@ variable "openai_api_key" {
 }
 
 variable "agent_api_endpoint" {
-  description = "Alex API endpoint from Part ingestion"
+  description = "Agent API endpoint from Part ingestion"
   type        = string
 }
 
 variable "agent_api_key" {
-  description = "Alex API key from Part igestion"
+  description = "Agent API key from Part igestion"
   type        = string
   sensitive   = true
 }
